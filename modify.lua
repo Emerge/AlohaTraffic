@@ -1,4 +1,5 @@
-local zlib = require "zlib" 
+local zlib = require "zlib"
+local buffer = {}
 
 function tableLen(t)
 	local count = 0
@@ -49,20 +50,30 @@ function extract(data)
 	return t
 end
 
-function modify(data)
+function modify(data, isresp, ctx, encoding)
+	print (isresp, ctx, encoding)
+	if (encoding) then
+		local decompres = zlib.inflate()
+		local r = decompress(data)
+		r = string.gsub(r, "<title>", "<title>HOLY")
+		local compress = zlib.deflate()
+		data = compress(r)
+	else
+		data = string.gsub(r, "<title>", "<title>HOLY")
+	end	
+	--if (isresp) then print(data) end
 	--print("============================== DATA BEGIN")
 	--print(data)
 	--print("============================== DATA END")
 
-	local len = data.gmatch(data, "Content.Length. (%d)+")()
-	if (len) then
-		print("replace len: " .. len .. " as : " .. (len + 4) )
-		data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
-	end
+	--local len = data.gmatch(data, "Content.Length. (%d)+")()
+	--if (len) then
+	--	print("replace len: " .. len .. " as : " .. (len + 4) )
+	--	data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
+	--end
 
-	data = string.gsub(data, "Accept.Encoding.-\n", "")
-	data = string.gsub(data, "<title>", "<title>HOLY")
-
+	--data = string.gsub(data, "Accept.Encoding.-\n", "")
+	--data = string.gsub(data, "<title>", "<title>HOLY")
 	--if (string.match(data, "Content.Type. text/html")) then
 	--	local stream = zlib.inflate()
 	--	local r = stream(t.data)
