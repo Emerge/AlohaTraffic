@@ -1,4 +1,4 @@
-local zlib = require "zlib"
+--local zlib = require "zlib"
 local buffer = {}
 
 function tableLen(t)
@@ -50,17 +50,30 @@ function extract(data)
 	return t
 end
 
-function modify(data, isresp, ctx, encoding)
-	print (isresp, ctx, encoding)
-	if (encoding) then
-		local decompres = zlib.inflate()
-		local r = decompress(data)
-		r = string.gsub(r, "<title>", "<title>HOLY")
-		local compress = zlib.deflate()
-		data = compress(r)
+function modify(data, isbody, ctx) -- response only
+	if (isbody == false) then
+		local len = data.gmatch(data, "Content.Length. (%d)+")()
+		if (len) then
+			print("replace len: " .. len .. " as : " .. (len + 4) )
+			data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
+		end
 	else
-		data = string.gsub(r, "<title>", "<title>HOLY")
-	end	
+		data = string.gsub(data, "<title>", "<title>HOLY")
+	end
+
+	print (data, isbody, ctx)
+	
+	--if (encoding) then
+	--	local decompres = zlib.inflate()
+	--	local r = decompress(data)
+	--	r = string.gsub(r, "<title>", "<title>HOLY")
+	--	local compress = zlib.deflate()
+	--	data = compress(r)
+	--else
+	--	data = string.gsub(r, "<title>", "<title>HOLY")
+	--end	
+
+
 	--if (isresp) then print(data) end
 	--print("============================== DATA BEGIN")
 	--print(data)
