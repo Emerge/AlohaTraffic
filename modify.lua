@@ -16,6 +16,12 @@ function extract(data)
 	for str in string.gmatch(data, ".-\n") do
         --print("_________________________________", str)
 
+        if (string.match(str, "^%s+$")) then
+			--print("HEAD.................................................")
+        	head = false
+        	i = 1
+        end
+
 		if (head) then 
 			t.headers[i] = str 
 		else
@@ -23,15 +29,14 @@ function extract(data)
 		end
         i = i + 1
         
-        if (string.match(str, "^%s+$")) then
-			--print("HEAD.................................................")
-        	head = false
-        	i = 1
-        end
+        
     end
 
     if(tableLen(t.headers) == 0) then
     	t.type = "UNKOWN"	
+    	print("============================== UNKOWN DATA BEGIN")
+    	print(data)
+    	print("============================== UNKOWN DATA END")
     else 
 		t.statusCode = string.match(t.headers[1], "HTTP/1.1 (%d+)")
 		if (t.statusCode) then
@@ -45,34 +50,59 @@ function extract(data)
 end
 
 function modify(data)
-	--print("============================== INFO:")
-	local t = extract(data)
-	local count = tableLen(t)
-	--print("lines count:", count, t.type, t.lines[1])
+	--print("============================== DATA BEGIN")
+	--print(data)
+	--print("============================== DATA END")
 
-	if (t.type == "UNKOWN") then
-		print("UNKOWN TYPE")
-
-	elseif (t.type == "REQ") then
-		if (string.match(data, "Accept.Encoding.-\n")) then
-			--print("=========================== REMOVE GZIP DEFLATE")
-			data = string.gsub(data, "Accept.Encoding.-\n", "")
-		end
-
-	elseif (t.type == "RES" and t.html) then
-		if (string.match(data, "Content.Encoding. gzip")) then
-			print("============================== GZIP DATA:")
-			local stream = zlib.inflate()
-			local r = stream(t.data)
-			print(r)
-			
-			--for line in stream:lines() do
-			--	print(line)
-			--end
-		else 
-			print(data)
-		end
+	local len = data.gmatch(data, "Content.Length. (%d)+")()
+	if (len) then
+		print("replace len: " .. len .. " as : " .. (len + 4) )
+		data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
 	end
+
+	data = string.gsub(data, "Accept.Encoding.-\n", "")
+	data = string.gsub(data, "<title>", "<title>HOLY")
+
+	--if (string.match(data, "Content.Type. text/html")) then
+	--	local stream = zlib.inflate()
+	--	local r = stream(t.data)
+	--end
+
+	--local t = extract(data)
+	--local count = tableLen(t)
+
+	--if (t.type == "UNKOWN") then
+	--	print("UNKOWN TYPE")
+
+	--elseif (t.type == "REQ") then
+	--	if (string.match(data, "Accept.Encoding.-\n")) then
+			--print("=========================== REMOVE GZIP DEFLATE")
+	--		data = string.gsub(data, "Accept.Encoding.-\n", "")
+	--	end
+
+	--elseif (t.type == "RES" and t.html) then
+	--	local total, current, buffer
+	--	local len = data.gmatch(data, "Content.Length. (%d)+")()
+	--	if (len) then
+	--		buffer = ""
+	--		current = 0
+	--		total = len 
+	--	end
+
+	--	current = current + string.len(data)
+	--	buffer = buffer..data
+
+	--	if (string.match(data, "Content.Encoding. gzip")) then
+	--		print("============================== GZIP DATA:")
+	--		local stream = zlib.inflate()
+	--		local r = stream(t.data)
+	--		print(r)
+			
+	--	else 
+	--		print("============================== PLAIN DATA:")
+	--		print(data)
+	--	end
+	--end
     -- data = string.gsub(data, "gzip, deflate", "") --for requests
     --data = string.gsub(data, "<title>", "<title>HOLY") --for responses
     return data
