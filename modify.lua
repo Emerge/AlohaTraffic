@@ -1,4 +1,4 @@
-local zip = require("zlib")
+local zlib = require "zlib" 
 
 function tableLen(t)
 	local count = 0
@@ -35,6 +35,7 @@ function extract(data)
     else 
 		t.statusCode = string.match(t.headers[1], "HTTP/1.1 (%d+)")
 		if (t.statusCode) then
+			if (string.match(data, "Content.Type. text/html")) then t.html = true end
 			t.type = "RES"
 		else
 			t.type = "REQ"
@@ -58,10 +59,18 @@ function modify(data)
 			data = string.gsub(data, "Accept.Encoding.-\n", "")
 		end
 
-	elseif (t.type == "RES") then
-		if (string.match(data, "Content.Encoding. gzip") and string.match(data, "Content.Type. text/html")) then
+	elseif (t.type == "RES" and t.html) then
+		if (string.match(data, "Content.Encoding. gzip")) then
 			print("============================== GZIP DATA:")
-			print(t.data)
+			local stream = zlib.inflate()
+			local r = stream(t.data)
+			print(r)
+			
+			--for line in stream:lines() do
+			--	print(line)
+			--end
+		else 
+			print(data)
 		end
 	end
     -- data = string.gsub(data, "gzip, deflate", "") --for requests
