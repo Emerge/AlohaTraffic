@@ -1,2 +1,5 @@
 apt-get install libevent-dev
-apt-get install luarocks
+
+wget http://zlib.net/zlib-1.2.8.tar.gz
+git clone https://github.com/brimworks/lua-zlib
+
