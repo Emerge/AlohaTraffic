@@ -1698,7 +1698,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		}
 		lua_getglobal(L, "modify");
 		lua_pushlstring(L, in, inlen);
-		lua_pushnumber(L, !ctx->seen_resp_header); //is_body
+		lua_pushnumber(L, ctx->seen_resp_header); //is_body
 		lua_pushnumber(L, (unsigned long)ctx); 
 		lua_pushlstring(L, ctx->http_host, strlen(ctx->http_host)); //host
 		unsigned char l = 3 + 1;
