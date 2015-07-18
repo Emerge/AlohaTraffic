@@ -135,6 +135,7 @@ typedef struct pxy_conn_ctx {
 	unsigned int ocsp_denied : 1;                /* 1 if OCSP was denied */
 	unsigned int enomem : 1;                       /* 1 if out of memory */
 	unsigned int sni_peek_retries : 6;       /* max 64 SNI parse retries */
+	unsigned int modifystate : 1;       /* max 64 SNI parse retries */
 
 	/* server name indicated by client in SNI TLS extension */
 	char *sni;
@@ -1362,6 +1363,7 @@ pxy_http_resphdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 		    /* HPKP: Public Key Pinning Extension for HTTP
 		     * (draft-ietf-websec-key-pinning)
 		     * remove to prevent public key pinning */
+		    !strncasecmp(line, "Content-Security-Policy:", 23) ||
 		    !strncasecmp(line, "Public-Key-Pins:", 16) ||
 		    !strncasecmp(line, "Public-Key-Pins-Report-Only:", 28) ||
 		    /* HSTS: HTTP Strict Transport Security (RFC 6797)
@@ -1673,7 +1675,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	}
 
 #ifdef HAVE_LUA
-	if (ctx->opts->luamodify && bev == ctx->dst.bev && ctx->http_content_type_resp 
+	if (!ctx->modifystate && ctx->opts->luamodify && bev == ctx->dst.bev && ctx->http_content_type_resp 
 		&& !strncasecmp(ctx->http_content_type_resp, "text/html", 9)) {
 		int success = 1;
 		size_t inlen = evbuffer_get_length(inbuf);
@@ -1698,10 +1700,10 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		}
 		lua_getglobal(L, "modify");
 		lua_pushlstring(L, in, inlen);
-		lua_pushnumber(L, ctx->seen_resp_header); //is_body
+		//lua_pushnumber(L, ctx->seen_resp_header); //is_body
 		lua_pushnumber(L, (unsigned long)ctx); 
 		lua_pushlstring(L, ctx->http_host, strlen(ctx->http_host)); //host
-		unsigned char l = 3 + 1;
+		unsigned char l = 3;
 		free(in);
 		if (lua_pcall(L, l, 1, 0) != 0) {
 			log_err_printf("Error calling lua function 'modify': "
@@ -1710,7 +1712,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 			goto luaout;
 		}
 		if (!lua_isstring(L, -1)) {
-			log_err_printf("Function 'modify' must return a string\n");
+			//log_err_printf("Function 'modify' must return a string\n");
 			success = 0;
 			goto luaout;
 		}
@@ -1728,6 +1730,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		}
 luaout:
 		if (success) {
+			ctx->modifystate = 1;
 			evbuffer_add(outbuf, out, outlen);
 			evbuffer_drain(inbuf, inlen);
 		} else {
