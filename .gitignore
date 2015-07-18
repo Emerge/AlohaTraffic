@@ -40,4 +40,5 @@ luac.out
 *.hex
 
 .DS_Store
+server/node_modules/
 
