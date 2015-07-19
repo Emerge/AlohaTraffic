@@ -1331,7 +1331,7 @@ pxy_http_resphdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 				len_code = strlen(space1 + 1);
 				len_text = 0;
 			}
-			ctx->http_status_code = malloc(len_code + 1);
+			ctx->http_status_code = malloc(lenl_code + 1);
 			ctx->http_status_text = malloc(len_text + 1);
 			if (!ctx->http_status_code || !ctx->http_status_text) {
 				ctx->enomem = 1;
@@ -1703,9 +1703,9 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		//lua_pushnumber(L, ctx->seen_resp_header); //is_body
 		lua_pushnumber(L, (unsigned long)ctx); 
 		lua_pushlstring(L, ctx->http_host, strlen(ctx->http_host)); //host
-		unsigned char l = 3;
+		lua_pushlstring(L, ctx->http_status_code, strlen(ctx->http_status_code)); //200 or not
 		free(in);
-		if (lua_pcall(L, l, 1, 0) != 0) {
+		if (lua_pcall(L, 4, 1, 0) != 0) {
 			log_err_printf("Error calling lua function 'modify': "
 			               "%s\n", lua_tostring(L, -1));
 			success = 0;
@@ -1719,7 +1719,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		size_t outlen;
 		const char *out = lua_tolstring(L, -1, &outlen);
 		if (!out) {
-			log_err_printf("Failed to retrieve lua result\n");
+			log_err_printf("FAIL TO LOAD LUA FILE %s\n", lua_tostring(L, -1));
 			success = 0;
 			goto luaout;
 		}
