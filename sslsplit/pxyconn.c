@@ -1243,6 +1243,7 @@ pxy_bufferevent_setup(pxy_conn_ctx_t *ctx, evutil_socket_t fd, SSL *ssl)
 static char *
 pxy_http_reqhdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 {
+//	printf("HEAD: %s\n", line);
 	/* parse information for connect log */
 	if (!ctx->http_method) {
 		/* first line */
@@ -1283,6 +1284,7 @@ pxy_http_reqhdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 
 		if (!ctx->http_host && !strncasecmp(line, "Host:", 5)) {
 			ctx->http_host = strdup(util_skipws(line + 5));
+//			printf("HOST! %s\n",ctx->http_host);
 			if (!ctx->http_host) {
 				ctx->enomem = 1;
 				return NULL;
@@ -1565,8 +1567,15 @@ pxy_conn_terminate_free(pxy_conn_ctx_t *ctx)
 static void
 pxy_bev_readcb(struct bufferevent *bev, void *arg)
 {
+	
 	pxy_conn_ctx_t *ctx = arg;
 	pxy_conn_desc_t *other = (bev==ctx->src.bev) ? &ctx->dst : &ctx->src;
+/*
+	if(ctx->modifystate)
+		printf("PASS: %s\n ", ctx->http_host);
+	else
+		printf("!!!! -> %s %s \n", ctx->http_host, ctx->http_uri);
+*/
 
 #ifdef DEBUG_PROXY
 	if (OPTS_DEBUG(ctx->opts)) {
@@ -1576,20 +1585,39 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 #endif /* DEBUG_PROXY */
 
 	if (!ctx->connected) {
+#ifdef SAFE
 		log_err_printf("readcb called when other end not connected - "
 		               "aborting.\n");
 		/* XXX should signal main loop instead of calling exit() */
 		log_fini();
 		exit(EXIT_FAILURE);
+#endif
+		return;
 	}
 
 	struct evbuffer *inbuf = bufferevent_get_input(bev);
 	if (other->closed) {
+//		printf("OTHEREND CLOSED");
 		evbuffer_drain(inbuf, evbuffer_get_length(inbuf));
 		return;
 	}
 
 	struct evbuffer *outbuf = bufferevent_get_output(other->bev);
+
+	if(ctx->passthrough) goto fin;
+
+	if(ctx->spec->http && !ctx->seen_req_header && (bev == ctx->src.bev) 
+	&& !ctx->passthrough) {
+		if(evbuffer_search(inbuf, "Host", 4, NULL).pos < 0 &&
+		   evbuffer_search(inbuf, "HOST", 4, NULL).pos < 0 &&
+		   evbuffer_search(inbuf, "host", 4, NULL).pos < 0)
+		{
+			//printf("BINARY HEADER! BYPASS");
+			ctx->passthrough = 1;
+			goto fin;
+		}
+	}
+
 
 	/* request header munging */
 	if (ctx->spec->http && !ctx->seen_req_header && (bev == ctx->src.bev)
@@ -1613,6 +1641,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 				}
 			}
 			replace = pxy_http_reqhdr_filter_line(line, ctx);
+//			printf("REPLACE: %s\n", replace);
 			if (replace == line) {
 				evbuffer_add_printf(outbuf, "%s\r\n", line);
 			} else if (replace) {
@@ -1637,7 +1666,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 			}
 		}
 		if (!ctx->seen_req_header)
-			return;
+			goto fin;
 	} else
 	/* response header munging */
 	if (ctx->spec->http && !ctx->seen_resp_header && (bev == ctx->dst.bev)
@@ -1685,10 +1714,9 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 			}
 		}
 		if (!ctx->seen_resp_header)
-			return;
+			goto fin;
 		
 	}
-
 	/* out of memory condition? */
 	if (ctx->enomem) {
 		pxy_conn_terminate_free(ctx);
@@ -1738,7 +1766,10 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		//lua_pushnumber(L, ctx->seen_resp_header); //is_body
 		lua_pushnumber(L, (unsigned long)ctx); 
 		lua_pushlstring(L, ctx->http_host, strlen(ctx->http_host)); //host
-		unsigned char l = 3;
+		lua_pushlstring(L, ctx->http_method, strlen(ctx->http_method));
+		lua_pushlstring(L, ctx->http_uri, strlen(ctx->http_uri));
+		lua_pushlstring(L, ctx->http_status_code, strlen(ctx->http_status_code));
+		unsigned char l = 5;
 		free(in);
 		if (lua_pcall(L, l, 1, 0) != 0) {
 			log_err_printf("Error calling lua function 'modify': "
@@ -1773,6 +1804,7 @@ luaout:
 		}
 	} else {
 #endif /* HAVE_LUA */
+fin:
 		evbuffer_add_buffer(outbuf, inbuf);
 #ifdef HAVE_LUA
 	}
