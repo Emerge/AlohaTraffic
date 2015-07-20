@@ -64,6 +64,24 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+
+static lua_State*  
+lua_init(const char* file)
+{
+		lua_State *L = luaL_newstate();
+		if (!L) {
+			log_err_printf("Failed to allocate new lua state\n");
+			return NULL;
+		}
+		luaL_openlibs(L);
+		if (luaL_dofile(L, file)) {
+			log_err_printf("Failed to do lua file\n");
+			return NULL;
+		}
+		return L;
+}
+
+
 #endif /* HAVE_LUA */
 
 
@@ -136,7 +154,7 @@ typedef struct pxy_conn_ctx {
 	unsigned int enomem : 1;                       /* 1 if out of memory */
 	unsigned int sni_peek_retries : 6;       /* max 64 SNI parse retries */
 	unsigned int modifystate : 1;       /* max 64 SNI parse retries */
-
+	unsigned int text_html : 1;
 	/* server name indicated by client in SNI TLS extension */
 	char *sni;
 
@@ -1269,6 +1287,25 @@ pxy_http_reqhdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 				ctx->enomem = 1;
 				return NULL;
 			}
+			lua_State *L = lua_init(ctx->opts->luamodify);
+			if(!L){
+				ctx->passthrough = 1; //passthrough!
+			}
+			else{
+				lua_getglobal(L, "filterhost");
+				lua_pushlstring(L, ctx->http_host, strlen(ctx->http_host));
+				if (lua_pcall(L, 1, 1, 0) != 0) {
+					log_err_printf("Error calling lua function 'filterhost': "
+					               "%s\n", lua_tostring(L, -1));
+					ctx->passthrough = 1; //passthrough!
+				}
+				if (!lua_isboolean(L, -1)) {
+					ctx->passthrough = 1; //passthrough!
+				} else if (lua_toboolean(L, -1)) {
+					ctx->passthrough = 0; //good.. captured
+				}
+			}
+			
 		} else if (!strncasecmp(line, "Content-Type:", 13)) {
 			ctx->http_content_type = strdup(util_skipws(line + 13));
 			if (!ctx->http_content_type) {
@@ -1359,6 +1396,7 @@ pxy_http_resphdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 		    !strncasecmp(line, "Content-Type:", 13)) {
 			ctx->http_content_type_resp =
 				strdup(util_skipws(line + 13));
+			ctx->text_html = !strncasecmp(ctx->http_content_type_resp, "text/html", 9);
 		} else if (
 		    /* HPKP: Public Key Pinning Extension for HTTP
 		     * (draft-ietf-websec-key-pinning)
@@ -1558,7 +1596,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	    && !ctx->passthrough) {
 		logbuf_t *lb = NULL, *tail = NULL;
 		char *line;
-		while ((line = evbuffer_readln(inbuf, NULL,
+		while (!ctx->passthrough && (line = evbuffer_readln(inbuf, NULL,
 		                               EVBUFFER_EOL_CRLF))) {
 			char *replace;
 			if (WANT_CONTENT_LOG(ctx)) {
@@ -1606,7 +1644,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	    && !ctx->passthrough) {
 		logbuf_t *lb = NULL, *tail = NULL;
 		char *line;
-		while ((line = evbuffer_readln(inbuf, NULL,
+		while (!ctx->passthrough && (line = evbuffer_readln(inbuf, NULL,
 		                               EVBUFFER_EOL_CRLF))) {
 			char *replace;
 			if (WANT_CONTENT_LOG(ctx)) {
@@ -1675,8 +1713,12 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	}
 
 #ifdef HAVE_LUA
-	if (!ctx->modifystate && ctx->opts->luamodify && bev == ctx->dst.bev && ctx->http_content_type_resp 
-		&& !strncasecmp(ctx->http_content_type_resp, "text/html", 9)) {
+	if (ctx->seen_req_header 
+		&& !ctx->passthrough 
+		&& !ctx->modifystate 
+		&& ctx->opts->luamodify 
+		&& bev == ctx->dst.bev 
+		&& ctx->text_html) {
 		int success = 1;
 		size_t inlen = evbuffer_get_length(inbuf);
 		char *in = malloc(inlen);
@@ -1686,15 +1728,8 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 			goto luaout;
 		}
 		evbuffer_copyout(inbuf, in, inlen);
-		lua_State *L = luaL_newstate();
-		if (!L) {
-			log_err_printf("Failed to allocate new lua state\n");
-			success = 0;
-			goto luaout;
-		}
-		luaL_openlibs(L);
-		if (luaL_dofile(L, ctx->opts->luamodify)) {
-			log_err_printf("Failed to do lua file\n");
+		lua_State *L = lua_init(ctx->opts->luamodify);
+		if(!L){
 			success = 0;
 			goto luaout;
 		}
