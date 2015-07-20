@@ -1769,7 +1769,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		lua_pushlstring(L, ctx->http_method, strlen(ctx->http_method));
 		lua_pushlstring(L, ctx->http_uri, strlen(ctx->http_uri));
 		lua_pushlstring(L, ctx->http_status_code, strlen(ctx->http_status_code));
-		unsigned char l = 5;
+		unsigned char l = 6;
 		free(in);
 		if (lua_pcall(L, l, 1, 0) != 0) {
 			log_err_printf("Error calling lua function 'modify': "
