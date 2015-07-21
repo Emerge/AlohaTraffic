@@ -1585,7 +1585,7 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 #endif /* DEBUG_PROXY */
 
 	if (!ctx->connected) {
-#ifdef SAFE
+#ifndef ALWAYS_ALIVE
 		log_err_printf("readcb called when other end not connected - "
 		               "aborting.\n");
 		/* XXX should signal main loop instead of calling exit() */
