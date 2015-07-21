@@ -16,7 +16,7 @@ function matchHost(host, html, pattern)
 		if (string.len(matched) >= scriptLen and 
 			string.match(matched, 'content.type') == nil) then
 			print ("found ========== " .. matched) 	
-			return string.gsub(matched, '-', '.') --HOLY SHIT
+			return string.gsub(matched, '-', '.')
 		end	
 	end
 	return nil
