@@ -1307,6 +1307,7 @@ pxy_http_reqhdr_filter_line(const char *line, pxy_conn_ctx_t *ctx)
 					ctx->passthrough = 0; //good.. captured
 				}
 			}
+			lua_close(L);
 			
 		} else if (!strncasecmp(line, "Content-Type:", 13)) {
 			ctx->http_content_type = strdup(util_skipws(line + 13));
@@ -1785,11 +1786,13 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 		size_t outlen;
 		const char *out = lua_tolstring(L, -1, &outlen);
 		if (!out) {
+			lua_close(L);
 			log_err_printf("Failed to retrieve lua result\n");
 			success = 0;
 			goto luaout;
 		}
 		if (outlen != inlen) {
+			lua_close(L);
 			log_err_printf("Warning: lua 'modify' function "
 			               "changed data length: may result in "
 			               "browser confusion\n");
